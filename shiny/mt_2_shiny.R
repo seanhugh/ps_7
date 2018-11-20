@@ -19,9 +19,13 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       selectInput("data", "Data to Analyze:",
-                  c("Kavanaugh Approval" = "kav_percentage",
+      
+                  c("Raw Votes vs. 2016" = "vote_change",
+                    "Kavanaugh Approval" = "kav_percentage",
                     "Feminism Support" = "feminism_percentage",
                     "Clinton Margin" = "clint_margin",
+                    "Other vote Percentage" = "other_percentage",
+                    "Democrat vote Percentage" = "dem_percentage",
                     "Cell Usage" = "cell_percentage"))
     ),
     
@@ -43,7 +47,7 @@ server <- function(input, output) {
     
     
     datareact() %>% 
-      filter(UQ(as.name(input$data)) > 0) %>% 
+      filter(UQ(as.name(input$data)) != 0) %>% 
       ggplot(aes_string(x = input$data, y = "poll_accuracy", color = "Party")) + 
       geom_smooth(method = lm) +
       geom_point(size = 6, alpha = .3) +

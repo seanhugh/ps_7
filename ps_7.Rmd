@@ -242,7 +242,11 @@ actual_data_formatted <- actual_data %>%
   )) %>% 
   filter(Party != "Other") %>% 
   mutate(clint_margin = `2016 Clinton Margin`) %>% 
-  select(combo, rep_percentage, total_votes, Party)
+  mutate(vote_change = `Raw Votes vs. 2016`) %>% 
+  mutate(other_percentage = `Other %`) %>% 
+  mutate(dem_percentage = `Dem %`) %>% 
+  select(combo, rep_percentage, total_votes, Party, clint_margin, 
+         vote_change, other_percentage, dem_percentage)
 
 
 # 3. Merge these two datasets into 1 final dataset
