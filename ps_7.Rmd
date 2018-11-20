@@ -1,0 +1,209 @@
+---
+title: "PS7"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(dplyr)
+library(knitr)
+library(foreign)
+library(lubridate)
+library(kableExtra)
+library(shiny)
+library(tidytext)
+library(stringr)
+library(scales)
+library(readxl)
+
+```
+
+```{r prediction_data, echo = FALSE}
+
+# Let’s look at what factors are associated 
+#   with polling mistakes in UpShot/Siena.
+
+# STEPS:
+# 1. Download prediction data set
+# 2. Download actual results data set
+# 3. Merge these two datasets into 1 final dataset
+# 4. Download the election context dataset
+
+
+# 1. Download prediction data set
+
+# The following steps read in all poll data
+
+# Download the file from the designated URL 
+#   using the download.file() function
+# Mode = 'wb' to ensure that our file works
+#   on both windows and mac
+ 
+download.file(url = "https://goo.gl/ZRCBda",
+              destfile = "poll-results.zip",
+              mode = "wb")
+
+# Use the unzip() function to unzip the downloaded file
+
+unzip("poll-results.zip")
+
+# Create a function that reads in a csv and also uses 
+#    mutate() to add the filename to each row of the loaded data
+
+read_csv_filename <- function(fn) {
+    read_csv(fn) %>% 
+        mutate(filename = fn)
+}
+
+# Use the read_csv_filename function to read in all data 
+#    from csv files in the working directory. Uses a map 
+#    function to iterate through every element of read_csv_filename()
+
+all_election_data <-
+    list.files(path = "./2018-live-poll-results-master/data",
+               pattern = "*.csv", 
+               full.names = T) %>% 
+    map_df(~read_csv_filename(.))
+
+```
+
+
+```{r actual_data}
+
+# Prepare Prediction Data
+
+# 1. Prepare Prediction Data
+
+# Create combo to be used as unique ID for merge
+
+prediction_data <- all_election_data %>% 
+  mutate(type = case_when(
+    str_detect(filename, "sen") ~ "sen",
+    str_detect(filename, "gov") ~ "gov",
+    TRUE ~ "house"
+  )) %>% 
+  
+  mutate(fn = filename) %>% 
+  
+  separate(filename, 
+           c("ignore", 
+             "ignore2", 
+             "ignore3", 
+             "file_name2"), 
+            sep = "/") %>% 
+  
+  separate(file_name2, 
+           c("ignore4", 
+             "ignore5", 
+             "state", 
+             "wave"), 
+           sep = "-") %>%
+  
+  mutate(wave = case_when(
+    wave == "1.csv" ~ "one",
+    wave == "2.csv" ~ "two",
+    TRUE ~ "three"
+  )) %>% 
+  
+  mutate(state2 = substr(state, 
+                         start = 1, 
+                         stop = 2)) %>% 
+  
+  mutate(district = substr(state, 
+                           start = 3, 
+                           stop = 4)) %>% 
+  
+  mutate(combo = paste0(toupper(state2), "-", district)) %>% 
+
+  # Merge responses 3, 4, 5 into an other category
+  
+  mutate(response = case_when(
+              response == "3" ~ "other",
+              response == "4" ~ "other",
+              response == "5" ~ "other",
+              response == "6" ~ "other",
+              TRUE ~ response
+  )) %>% 
+  
+  group_by(combo, response, wave) %>% 
+  
+  
+  tally(wt = final_weight) %>% 
+  
+  # Use spread to seperate responses into columns by response
+  
+  spread(key = response, value = n, fill = 0) %>% 
+  
+  # Use mutate to calculate republican advantage
+  
+  mutate(tot = Dem + Rep + Und + other) %>% 
+  mutate(rep_advantage = (Rep - Dem) / tot) %>% 
+  select(combo, wave, rep_advantage) %>% 
+  
+  # Spread out rep_advantage values by wave
+  
+  spread(key = wave, value = rep_advantage, fill = 0) %>% 
+  mutate(rep_advantage = case_when(
+    three != 0 ~ three,
+    two != 0 ~ two,
+    TRUE ~ one 
+  )) %>% 
+  select(combo, rep_advantage)
+
+
+
+
+# 2. Download actual results data set
+
+# Use read_xlsx to read in Excel data
+
+actual_data <- read_xlsx("./data/2018 House Popular Vote Tracker.xlsx")
+
+# Use tail to remove the first two rows from the data
+
+actual_data_formatted <- actual_data %>% 
+  tail(-2) %>% 
+  
+  # Create a unique ID that matches the unique 
+  #    ID of the other data
+  
+  mutate(State = tolower(state.abb[match(State,state.name)])) %>% 
+  mutate(district = case_when(str_detect(`CD#`, ".0") ~ `CD#`,
+                              TRUE ~ "1.")) %>% 
+  separate(district, c("district","other")) %>% 
+  mutate(district2 = case_when(
+    as.numeric(district) < 10  ~ paste0("0", district),
+    TRUE ~ district
+  )) %>% 
+  mutate(combo = paste0(toupper(State), "-", district2)) %>% 
+  mutate(total_votes = `2016 Total Votes Cast`,
+         rep_advantage = (`GOP Votes` - `Dem Votes`)/ total_votes) %>% 
+  select(combo, rep_advantage, total_votes, State)
+
+
+# 3. Merge these two datasets into 1 final dataset
+
+# Use left_join to join the two datasets
+# Attach a suffix to the values to distinguish which
+#   dataset they come from
+
+joined_shiny_data <- left_join(actual_data_formatted, 
+                               prediction_data, 
+                               by = "combo",
+                              suffix = c(".actual", ".predict")) %>% 
+  filter(!is.na(rep_advantage.predict) & !is.na(rep_advantage.actual))
+
+# 4. Save the data using saveRDS
+
+# Save the data in the shiny folder so that it can 
+#   be accessed from the shiny app
+
+saveRDS(joined_shiny_data, file = "./shiny/shiny_data.rds")
+
+```
+
+
+
