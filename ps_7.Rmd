@@ -79,7 +79,7 @@ all_election_data <-
 
 # Create combo to be used as unique ID for merge
 
-prediction_data <- all_election_data %>% 
+prediction_data1 <- all_election_data %>% 
   mutate(type = case_when(
     str_detect(filename, "sen") ~ "sen",
     str_detect(filename, "gov") ~ "gov",
@@ -126,8 +126,9 @@ prediction_data <- all_election_data %>%
               response == "5" ~ "other",
               response == "6" ~ "other",
               TRUE ~ response
-  )) %>% 
+  )) 
   
+prediction_data2 <- prediction_data1 %>% 
   group_by(combo, response, wave) %>% 
   
   
@@ -140,21 +141,36 @@ prediction_data <- all_election_data %>%
   # Use mutate to calculate republican advantage
   
   mutate(tot = Dem + Rep + Und + other) %>% 
-  mutate(rep_advantage = (Rep - Dem) / tot) %>% 
-  select(combo, wave, rep_advantage) %>% 
+  mutate(rep_percentage = (Rep) / tot) %>% 
+  select(combo, wave, rep_percentage) %>% 
   
   # Spread out rep_advantage values by wave
   
-  spread(key = wave, value = rep_advantage, fill = 0) %>% 
-  mutate(rep_advantage = case_when(
+  spread(key = wave, value = rep_percentage, fill = 0) %>% 
+  mutate(rep_percentage = case_when(
     three != 0 ~ three,
     two != 0 ~ two,
     TRUE ~ one 
   )) %>% 
-  select(combo, rep_advantage)
+  select(combo, rep_percentage)
 
+# Get data on opinions to see if there is a political 
+#   bias in polls
 
+prediction_totals <- prediction_data1 %>% 
+  group_by(combo) %>% 
+  count()
 
+women_percentage <- prediction_data1 %>% 
+  group_by(combo) %>% 
+  count(WOMEN) %>% 
+  spread(key = WOMEN, value = n) %>%  
+  mutate(total = agree + disagree + `Don't know` + `<NA>`,
+         women_percentage = agree / (total))
+
+```
+
+```{r}
 
 # 2. Download actual results data set
 
@@ -180,8 +196,8 @@ actual_data_formatted <- actual_data %>%
   )) %>% 
   mutate(combo = paste0(toupper(State), "-", district2)) %>% 
   mutate(total_votes = `2016 Total Votes Cast`,
-         rep_advantage = (`GOP Votes` - `Dem Votes`)/ total_votes) %>% 
-  select(combo, rep_advantage, total_votes, State)
+         rep_percentage = (`GOP Votes`)/ total_votes) %>% 
+  select(combo, rep_percentage, total_votes, State)
 
 
 # 3. Merge these two datasets into 1 final dataset
@@ -194,7 +210,14 @@ joined_shiny_data <- left_join(actual_data_formatted,
                                prediction_data, 
                                by = "combo",
                               suffix = c(".actual", ".predict")) %>% 
-  filter(!is.na(rep_advantage.predict) & !is.na(rep_advantage.actual))
+  filter(!is.na(rep_percentage.predict) & !is.na(rep_percentage.actual)) %>% 
+
+  # Alter columns by looking at the discrepency in poll results
+   
+  mutate(poll_accuracy = 1 - abs((rep_percentage.actual - rep_percentage.predict) / rep_percentage.actual))
+
+joined_shiny_data
+
 
 # 4. Save the data using saveRDS
 
