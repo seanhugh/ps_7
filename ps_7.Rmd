@@ -157,17 +157,55 @@ prediction_data2 <- prediction_data1 %>%
 # Get data on opinions to see if there is a political 
 #   bias in polls
 
-prediction_totals <- prediction_data1 %>% 
-  group_by(combo) %>% 
-  count()
-
 women_percentage <- prediction_data1 %>% 
   group_by(combo) %>% 
   count(WOMEN) %>% 
-  spread(key = WOMEN, value = n) %>%  
-  mutate(total = agree + disagree + `Don't know` + `<NA>`,
-         women_percentage = agree / (total))
+  spread(key = WOMEN, value = n) %>%
+  mutate(na = ifelse(is.na(`<NA>`), 0, `<NA>`),
+         total = agree + disagree + `Don't know` + na,
+         women_percentage = agree / (total),
+         women_percentage = ifelse(is.na(women_percentage), 0, women_percentage)) %>% 
+  select(combo, women_percentage)
 
+feminism_percentage <- prediction_data1 %>% 
+  group_by(combo) %>% 
+  count(FEMINISM) %>% 
+  spread(key = FEMINISM, value = n) %>%
+  mutate(na = ifelse(is.na(`<NA>`), 0, `<NA>`),
+         total = support + oppose + `Don't know` + na,
+         feminism_percentage = support / (total),
+         feminism_percentage = ifelse(is.na(feminism_percentage), 0, feminism_percentage)) %>% 
+  select(combo, feminism_percentage)
+
+approveKav_percentage <- prediction_data1 %>% 
+  group_by(combo) %>% 
+  count(APPKAV) %>% 
+  spread(key = APPKAV, value = n) %>%
+  mutate(na = ifelse(is.na(`<NA>`), 0, `<NA>`),
+         total = support + oppose + `Don't know` + na,
+         kav_percentage = support / (total),
+         kav_percentage = ifelse(is.na(kav_percentage), 0, kav_percentage)) %>% 
+  select(combo, kav_percentage) 
+
+cell_percentage <- prediction_data1 %>% 
+  group_by(combo) %>% 
+  count(phone_type) %>% 
+  spread(key = phone_type, value = n) %>% 
+  mutate(total = Cell + Landline,
+         cell_percentage = Cell / (total),
+         cell_percentage = ifelse(is.na(cell_percentage), 0, cell_percentage)) %>% 
+  select(combo, cell_percentage) 
+
+prediction_data <- left_join(prediction_data2, 
+                               feminism_percentage, 
+                               by = "combo") %>% 
+                    left_join(., 
+                               approveKav_percentage, 
+                               by = "combo") %>% 
+                    left_join(., 
+                               cell_percentage, 
+                               by = "combo")
+  
 ```
 
 ```{r}
@@ -197,7 +235,14 @@ actual_data_formatted <- actual_data %>%
   mutate(combo = paste0(toupper(State), "-", district2)) %>% 
   mutate(total_votes = `2016 Total Votes Cast`,
          rep_percentage = (`GOP Votes`)/ total_votes) %>% 
-  select(combo, rep_percentage, total_votes, State)
+  mutate(Party = case_when(
+    Party == "D" ~ "Democrat",
+    Party == "R" ~ "Republican",
+    TRUE ~ "Other"
+  )) %>% 
+  filter(Party != "Other") %>% 
+  mutate(clint_margin = `2016 Clinton Margin`) %>% 
+  select(combo, rep_percentage, total_votes, Party)
 
 
 # 3. Merge these two datasets into 1 final dataset
@@ -215,8 +260,6 @@ joined_shiny_data <- left_join(actual_data_formatted,
   # Alter columns by looking at the discrepency in poll results
    
   mutate(poll_accuracy = 1 - abs((rep_percentage.actual - rep_percentage.predict) / rep_percentage.actual))
-
-joined_shiny_data
 
 
 # 4. Save the data using saveRDS

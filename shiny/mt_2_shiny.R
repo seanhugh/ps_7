@@ -13,16 +13,16 @@ project_data <- read_rds("./shiny_data.rds")
 ui <- fluidPage(
   
   # Application title
-  titlePanel("Election Predictions Expected Larger Republican Wins and Losses"),
+  titlePanel("Analyzing Prediction Accuracy by Poll Responses"),
   
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
-      sliderInput("bins",
-                  "Election Size (# of Votes):",
-                  min = 220000,
-                  max = 500000,
-                  value = 250000)
+      selectInput("data", "Data to Analyze:",
+                  c("Kavanaugh Approval" = "kav_percentage",
+                    "Feminism Support" = "feminism_percentage",
+                    "Clinton Margin" = "clint_margin",
+                    "Cell Usage" = "cell_percentage"))
     ),
     
     # Show a plot of the generated distribution
@@ -35,23 +35,19 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   
-  
   datareact <- reactive({
-    project_data %>% 
-      filter(total_votes < input$bins)      
+    project_data
   })
   
   output$distPlot <- renderPlot({
     
     
     datareact() %>% 
-      ggplot(aes(x = rep_advantage.predict, y = rep_advantage.actual)) + 
+      filter(UQ(as.name(input$data)) > 0) %>% 
+      ggplot(aes_string(x = input$data, y = "poll_accuracy", color = "Party")) + 
       geom_smooth(method = lm) +
       geom_point(size = 6, alpha = .3) +
-      geom_abline(intercept = 0, slope = 1) +
-      labs(x = "Predicted Republican Advantage",
-           y = "Actual Republican Advantage",
-           caption = "Prediction Data from Upshot/Siena polling data")
+      labs(caption = "Prediction Data from Upshot/Siena polling data")
   })
 }
 
