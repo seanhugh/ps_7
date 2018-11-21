@@ -1,0 +1,12 @@
+name: ps_7shiny
+title: ps_7shiny
+username:
+account: seanhugh
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 582957
+bundleId: 1712208
+url: https://seanhugh.shinyapps.io/ps_7shiny/
+when: 1542771807.40821
+asMultiple: FALSE
+asStatic: FALSE
