@@ -6,7 +6,7 @@ output: html_document
 ```{r setup, include=FALSE}
 
 knitr::opts_chunk$set(echo = TRUE)
-
+# Here we load the necessary libraries to complete the analysis
 library(tidyverse)
 library(dplyr)
 library(knitr)
@@ -78,7 +78,7 @@ all_election_data <-
 # 1. Prepare Prediction Data
 
 # Create combo to be used as unique ID for merge
-
+# We separate the type of elections out: senate, governor, house
 prediction_data1 <- all_election_data %>% 
   mutate(type = case_when(
     str_detect(filename, "sen") ~ "sen",
@@ -87,7 +87,8 @@ prediction_data1 <- all_election_data %>%
   )) %>% 
   
   mutate(fn = filename) %>% 
-  
+
+# This separates the name by these keywords.   
   separate(filename, 
            c("ignore", 
              "ignore2", 
@@ -101,17 +102,17 @@ prediction_data1 <- all_election_data %>%
              "state", 
              "wave"), 
            sep = "-") %>%
-  
+# We create a variable so that we know what wave of polling  
   mutate(wave = case_when(
     wave == "1.csv" ~ "one",
     wave == "2.csv" ~ "two",
     TRUE ~ "three"
   )) %>% 
-  
+# This extracts the state abbreviation. 
   mutate(state2 = substr(state, 
                          start = 1, 
                          stop = 2)) %>% 
-  
+# This extracts the district abbreviation.   
   mutate(district = substr(state, 
                            start = 3, 
                            stop = 4)) %>% 
@@ -131,7 +132,7 @@ prediction_data1 <- all_election_data %>%
 prediction_data2 <- prediction_data1 %>% 
   group_by(combo, response, wave) %>% 
   
-  
+  # Add polling weights
   tally(wt = final_weight) %>% 
   
   # Use spread to seperate responses into columns by response
@@ -235,13 +236,16 @@ actual_data_formatted <- actual_data %>%
   mutate(combo = paste0(toupper(State), "-", district2)) %>% 
   mutate(total_votes = `2016 Total Votes Cast`,
          rep_percentage = (`GOP Votes`)/ total_votes) %>% 
+  # This is where we sort by party.
   mutate(Party = case_when(
     Party == "D" ~ "Democrat",
     Party == "R" ~ "Republican",
     TRUE ~ "Other"
   )) %>% 
   filter(Party != "Other") %>% 
+  # We are creating a variable for how much Clinton won by.
   mutate(clint_margin = `2016 Clinton Margin`) %>% 
+  # This is the margin CLinton had in winning the election. 
   mutate(vote_change = `Raw Votes vs. 2016`) %>% 
   mutate(other_percentage = `Other %`) %>% 
   mutate(dem_percentage = `Dem %`) %>% 
